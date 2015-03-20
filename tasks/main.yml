@@ -1,0 +1,59 @@
+---
+# Main tasks for the mariadb role
+- name: Install mariadb
+  yum: name={{ item }} state=latest
+  with_items:
+    - MySQL-python
+    - mariadb
+    - mariadb-server
+  notify: 
+    - enable mariadb
+
+# This has to be here and not in a handler so that it executes immediately.
+# Handlers are sorted out after the play.
+- name: Ensure mariadb is running
+  service: name=mariadb state=started
+
+- name: Configure server settings
+  ini_file: >
+    dest=/etc/my.cnf.d/server.cnf
+    section={{ item.sec }}
+    option={{ item.opt }}
+    value={{ item.val }}
+  with_items:
+    - { sec: 'mysqld_safe', opt: 'default-character-set', val: 'utf8' }
+    - { sec: 'mysqld_safe', opt: 'character_set_server', val: 'utf8' }
+    - { sec: 'mysqld_safe', opt: 'default-collation', val: 'utf8_general_ci' }
+    - { sec: 'mysqld_safe', opt: 'collation_server', val: 'utf8_general_ci' }
+
+- name: Skip networking
+  lineinfile:
+    dest=/etc/my.cnf.d/server.cnf
+    line=skip-networking
+    insertafter="[mysqld]"
+
+- name: Update mysql root password for all root accounts
+  mysql_user: name=root host={{ item }} password={{ mysql_root_password }}
+  with_items:
+    - "{{ ansible_hostname }}"
+    - 127.0.0.1
+    - ::1
+    - localhost
+  notify: restart mariadb
+
+- name: Ensure a .my.cnf exists for root
+  template: >
+    src=root_my.cnf.j2
+    dest=/root/.my.cnf
+    owner=root
+    mode=0600
+
+- name: Delete anonymous users
+  mysql_user: user="" host={{ item }} state=absent
+  with_items:
+    - "{{ ansible_hostname }}"
+    - localhost
+  notify: restart mariadb
+
+- name: Remove test db
+  mysql_db: db=test state=absent

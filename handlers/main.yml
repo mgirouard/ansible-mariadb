@@ -1,0 +1,15 @@
+---
+# 
+# Handlers for MariaDB notifications
+# 
+# Enables mariadb on boot
+- name: enable mariadb
+  service: name=mariadb enabled=yes
+
+# Starts the mariadb service
+- name: start mariadb
+  service: name=mariadb state=started
+
+# Restarts the mariadb service
+- name: restart mariadb
+  service: name=mariadb state=restarted
